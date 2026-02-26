@@ -5,6 +5,7 @@
 Before starting tests, ensure:
 - [ ] Node.js 22.x or 23.x installed (`node -v`)
 - [ ] Pear runtime installed (`pear -v`)
+- [ ] DHT bootstrap configured (`--dht-bootstrap 127.0.0.1:49737` or `export DHT_BOOTSTRAP=127.0.0.1:49737`)
 - [ ] Dependencies installed (`npm install`)
 - [ ] No other Intercom instances running on same ports
 
@@ -16,7 +17,12 @@ Before starting tests, ensure:
 ```bash
 # Start admin peer
 pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
+  --dht-bootstrap 127.0.0.1:49737 \
   --subnet-channel intercom-bounty-test
+
+# In the peer prompt (>) run once before tests:
+/deploy_subnet
+/enable_transactions
 ```
 
 ### Tests to Run
@@ -30,15 +36,19 @@ pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
 /tx --command '{"op":"post_bounty","title":"Test Bounty 1","description":"Testing bounty creation","reward":"1000000000000000000"}'
 
 # Expected output:
+# MSB TX broadcasted: <tx-hash>
 # [IntercomBounty] Bounty posted: bounty_1 by trac1... - 1000000000000000000 TNK
 # Title: Test Bounty 1
+
+# If you only see "MSB TX broadcasted", wait a few seconds and verify:
+/tx --command "list_bounties" --sim 1
 ```
 
-**✅ PASS if:** Bounty ID created, poster address shown, title displayed
+**✅ PASS if:** TX hash is returned and bounty_1 appears in list/stats shortly after
 
 #### Test 1.2: List Bounties
 ```bash
-/tx --command "list_bounties"
+/tx --command "list_bounties" --sim 1
 
 # Expected output:
 # [IntercomBounty] Total bounties: 1
@@ -53,7 +63,7 @@ pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
 
 #### Test 1.3: Get Bounty Stats
 ```bash
-/tx --command "stats"
+/tx --command "stats" --sim 1
 
 # Expected output:
 # [IntercomBounty] Platform Statistics:
@@ -64,7 +74,7 @@ pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
 
 #### Test 1.4: View My Bounties
 ```bash
-/tx --command "my_bounties"
+/tx --command "my_bounties" --sim 1
 
 # Expected output:
 # [IntercomBounty] Your posted bounties: 1
@@ -83,7 +93,7 @@ pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
 # [IntercomBounty] Bounty cancelled: bounty_1
 
 # Verify with stats
-/tx --command "stats"
+/tx --command "stats" --sim 1
 # Should show: open: 0, cancelled: 1
 ```
 
@@ -98,6 +108,7 @@ pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
 **Terminal 1 - Admin (Poster):**
 ```bash
 pear run . --peer-store-name poster --msb-store-name poster-msb \
+  --dht-bootstrap 127.0.0.1:49737 \
   --subnet-channel intercom-bounty-test
 ```
 
@@ -106,6 +117,7 @@ Wait for admin to start, then copy the **Peer Writer** key from admin's banner.
 
 ```bash
 pear run . --peer-store-name worker --msb-store-name worker-msb \
+  --dht-bootstrap 127.0.0.1:49737 \
   --subnet-channel intercom-bounty-test \
   --subnet-bootstrap <ADMIN_WRITER_KEY_HEX>
 ```
@@ -320,6 +332,7 @@ pear run . --peer-store-name worker --msb-store-name worker-msb \
 ```bash
 # Start peer with sidechannel
 pear run . --peer-store-name test-sc --msb-store-name test-sc-msb \
+  --dht-bootstrap 127.0.0.1:49737 \
   --subnet-channel intercom-bounty-test \
   --sidechannels bounty-feed
 ```
@@ -360,6 +373,7 @@ openssl rand -hex 32
 
 # Start peer with SC-Bridge
 pear run . --peer-store-name agent-test --msb-store-name agent-test-msb \
+  --dht-bootstrap 127.0.0.1:49737 \
   --subnet-channel intercom-bounty-test \
   --sc-bridge 1 \
   --sc-bridge-token a1b2c3d4e5f6...

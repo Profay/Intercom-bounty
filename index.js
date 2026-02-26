@@ -304,6 +304,11 @@ const scBridgeDebugRaw =
   env.SC_BRIDGE_DEBUG ||
   '';
 const scBridgeDebug = parseBool(scBridgeDebugRaw, false);
+const verboseRaw =
+  (flags['verbose'] && String(flags['verbose'])) ||
+  env.INTERCOM_VERBOSE ||
+  '';
+const verbose = parseBool(verboseRaw, false);
 
 // Optional: override DHT bootstrap nodes (host:port list) for faster local tests.
 // Note: this affects all Hyperswarm joins (subnet replication + sidechannels).
@@ -414,36 +419,48 @@ if (!subnetBootstrap) {
 }
 
 console.log('');
-console.log('====================INTERCOM ====================');
 const msbChannel = b4a.toString(msbConfig.channel, 'utf8');
 const msbStorePath = path.join(msbStoresDirectory, msbStoreName);
 const peerStorePath = path.join(peerStoresDirectory, peerStoreNameRaw);
 const peerWriterKey = peer.writerLocalKey ?? peer.base?.local?.key?.toString('hex') ?? null;
-console.log('MSB network bootstrap:', msbBootstrapHex);
-console.log('MSB channel:', msbChannel);
-console.log('MSB store:', msbStorePath);
-console.log('Peer store:', peerStorePath);
-if (Array.isArray(msbConfig?.dhtBootstrap) && msbConfig.dhtBootstrap.length > 0) {
-  console.log('MSB DHT bootstrap nodes:', msbConfig.dhtBootstrap.join(', '));
+if (verbose) {
+  console.log('====================INTERCOM ====================');
+  console.log('MSB network bootstrap:', msbBootstrapHex);
+  console.log('MSB channel:', msbChannel);
+  console.log('MSB store:', msbStorePath);
+  console.log('Peer store:', peerStorePath);
+  if (Array.isArray(msbConfig?.dhtBootstrap) && msbConfig.dhtBootstrap.length > 0) {
+    console.log('MSB DHT bootstrap nodes:', msbConfig.dhtBootstrap.join(', '));
+  }
+  if (Array.isArray(peerConfig?.dhtBootstrap) && peerConfig.dhtBootstrap.length > 0) {
+    console.log('Peer DHT bootstrap nodes:', peerConfig.dhtBootstrap.join(', '));
+  }
+  console.log('Peer subnet bootstrap:', effectiveSubnetBootstrapHex);
+  console.log('Peer subnet channel:', subnetChannel);
+  console.log('Peer pubkey (hex):', peer.wallet.publicKey);
+  console.log('Peer trac address (bech32m):', peer.wallet.address ?? null);
+  console.log('Peer writer key (hex):', peerWriterKey);
+  console.log('Sidechannel entry:', sidechannelEntry);
+  if (sidechannelExtras.length > 0) {
+    console.log('Sidechannel extras:', sidechannelExtras.join(', '));
+  }
+  if (scBridgeEnabled) {
+    const portDisplay = Number.isSafeInteger(scBridgePort) ? scBridgePort : 49222;
+    console.log('SC-Bridge:', `ws://${scBridgeHost}:${portDisplay}`);
+  }
+  console.log('================================================================');
+  console.log('');
 }
-if (Array.isArray(peerConfig?.dhtBootstrap) && peerConfig.dhtBootstrap.length > 0) {
-  console.log('Peer DHT bootstrap nodes:', peerConfig.dhtBootstrap.join(', '));
-}
-console.log('Peer subnet bootstrap:', effectiveSubnetBootstrapHex);
-console.log('Peer subnet channel:', subnetChannel);
-console.log('Peer pubkey (hex):', peer.wallet.publicKey);
-console.log('Peer trac address (bech32m):', peer.wallet.address ?? null);
-console.log('Peer writer key (hex):', peerWriterKey);
-console.log('Sidechannel entry:', sidechannelEntry);
-if (sidechannelExtras.length > 0) {
-  console.log('Sidechannel extras:', sidechannelExtras.join(', '));
-}
-if (scBridgeEnabled) {
-  const portDisplay = Number.isSafeInteger(scBridgePort) ? scBridgePort : 49222;
-  console.log('SC-Bridge:', `ws://${scBridgeHost}:${portDisplay}`);
-}
-console.log('================================================================');
-console.log('');
+console.log('IntercomBounty ready ✨  (use /menu for commands)');
+
+Terminal.prototype.printHelp = function printHelpCompact() {
+  console.log('IntercomBounty Help');
+  console.log('  /menu      Show friendly command menu');
+  console.log('  /examples  Show copy-paste examples');
+  console.log('  /doctor    Check TX readiness');
+  console.log('  /help      Show this help');
+  console.log('  /exit      Exit app');
+};
 
 const admin = await peer.base.view.get('admin');
 if (admin && admin.value === peer.wallet.publicKey && peer.base.writable) {

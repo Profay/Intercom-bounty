@@ -3,6 +3,10 @@ import { bufferToBigInt, bigIntToDecimalString } from "trac-msb/src/utils/amount
 import b4a from "b4a";
 import PeerWallet from "trac-wallet";
 import fs from "fs";
+import { createHash } from "trac-peer/src/utils/types.js";
+import { MSB_OPERATION_TYPE } from "trac-peer/src/msbClient.js";
+
+const READ_TX_TYPES = new Set(['listBounties', 'getMyBounties', 'getMyClaimedBounties', 'getBountyStats', 'getBounty']);
 
 const stableStringify = (value) => {
     if (value === null || value === undefined) return 'null';
@@ -123,6 +127,124 @@ class BountyProtocol extends Protocol{
         }
     }
 
+    async tx(subject, sim = false, surrogate = null) {
+        if (!subject || typeof subject.command !== 'string') {
+            throw new Error('Missing option. Please use the --command flag.');
+        }
+
+        const mapped = this.mapTxCommand(subject.command);
+        if (mapped === null || typeof mapped.type !== 'string' || mapped.value === undefined) {
+            throw new Error('IntercomBounty: command not found. Run /help for available commands.');
+        }
+
+        const readCommand = READ_TX_TYPES.has(mapped.type);
+        let runSim = sim === true;
+
+        if (readCommand && !runSim) {
+            console.log('[IntercomBounty] Read command detected. Running with simulation mode (--sim 1).');
+            runSim = true;
+        }
+
+        if (!runSim && !readCommand) {
+            const validators = this.peer?.msbClient?.getConnectedValidatorsCount?.() ?? 0;
+            if (validators <= 0) {
+                throw new Error('No connected MSB validators. TX would be dropped. Wait for validator connectivity, run /deploy_subnet, then /enable_transactions. For reads use --sim 1.');
+            }
+        }
+
+        return await this.broadcastTransaction({
+            type: mapped.type,
+            value: mapped.value
+        }, runSim, surrogate);
+    }
+
+    async broadcastTransaction(obj, sim = false, surrogate = null) {
+        const txEnabled = await this.peer.base.view.get('txen');
+        if (txEnabled !== null && txEnabled.value !== true) {
+            throw new Error('Tx is not enabled. Run /enable_transactions first.');
+        }
+        if (this.peer.wallet.publicKey === null || this.peer.wallet.secretKey === null) {
+            throw new Error('Wallet is not initialized.');
+        }
+        if (this.peer.writerLocalKey === null) {
+            throw new Error('Local writer is not initialized.');
+        }
+        if (obj.type === undefined || obj.value === undefined) {
+            throw new Error('Invalid transaction object.');
+        }
+
+        const validatorPubKey = '0'.repeat(64);
+        if (sim === true) {
+            return await this.simulateTransaction(validatorPubKey, obj, surrogate);
+        }
+
+        const txvHex = await this.peer.msbClient.getTxvHex();
+        const msbBootstrapHex = this.peer.msbClient.bootstrapHex;
+        const subnetBootstrapHex = (b4a.isBuffer(this.peer.config.bootstrap) ? this.peer.config.bootstrap.toString('hex') : ('' + this.peer.config.bootstrap)).toLowerCase();
+        const contentHash = await createHash(this.safeJsonStringify(obj));
+
+        let nonceHex;
+        let txHex;
+        let signatureHex;
+        let pubKeyHex;
+
+        if (surrogate !== null) {
+            nonceHex = surrogate.nonce;
+            txHex = surrogate.tx;
+            signatureHex = surrogate.signature;
+            pubKeyHex = surrogate.address;
+        } else {
+            nonceHex = this.generateNonce();
+            txHex = await this.generateTx(
+                this.peer.msbClient.networkId,
+                txvHex,
+                this.peer.writerLocalKey,
+                contentHash,
+                subnetBootstrapHex,
+                msbBootstrapHex,
+                nonceHex
+            );
+            signatureHex = this.peer.wallet.sign(b4a.from(txHex, 'hex'));
+            pubKeyHex = this.peer.wallet.publicKey;
+        }
+
+        const address = this.peer.msbClient.pubKeyHexToAddress(pubKeyHex);
+        if (address === null) {
+            throw new Error('Failed to create MSB address from public key.');
+        }
+
+        const payload = {
+            type: MSB_OPERATION_TYPE.TX,
+            address,
+            txo: {
+                tx: txHex,
+                txv: txvHex,
+                iw: this.peer.writerLocalKey,
+                in: nonceHex,
+                ch: contentHash,
+                is: signatureHex,
+                bs: subnetBootstrapHex,
+                mbs: msbBootstrapHex
+            }
+        };
+
+        const broadcastResult = await this.peer.msbClient.broadcastTransaction(payload);
+        const failedBroadcast =
+            broadcastResult === false ||
+            broadcastResult === null ||
+            (typeof broadcastResult === 'object' && typeof broadcastResult.message === 'string' && /failed/i.test(broadcastResult.message));
+
+        if (failedBroadcast) {
+            throw new Error('MSB transaction broadcast failed. Ensure /deploy_subnet succeeded and validators are reachable.');
+        }
+
+        if (this.peer.txPool.isNotFull() && !this.peer.txPool.contains(txHex)) {
+            this.peer.txPool.add(txHex, { dispatch: obj, ipk: pubKeyHex, address });
+        }
+
+        return payload;
+    }
+
     /**
      * Map transaction commands to contract functions
      * IntercomBounty supports both simple commands and JSON payloads
@@ -233,31 +355,14 @@ class BountyProtocol extends Protocol{
      */
     async printOptions(){
         console.log(' ');
-        console.log('=== IntercomBounty Commands ===');
-        console.log(' ');
-        console.log('BOUNTY OPERATIONS (Write):');
-        console.log('- /bounty_post --title "<title>" --desc "<description>" --reward "<amount>" | Post a new bounty');
-        console.log('- /bounty_claim --id "<bountyId>" | Claim an open bounty');
-        console.log('- /bounty_submit --id "<bountyId>" --proof "<url_or_text>" | Submit work for claimed bounty');
-        console.log('- /bounty_approve --id "<bountyId>" | Approve work and release funds');
-        console.log('- /bounty_reject --id "<bountyId>" --reason "<text>" | Reject work');
-        console.log('- /bounty_cancel --id "<bountyId>" | Cancel unclaimed bounty');
-        console.log(' ');
-        console.log('BOUNTY QUERIES (Read):');
-        console.log('- /tx --command "list_bounties" | List all bounties');
-        console.log('- /tx --command "my_bounties" | Show your posted bounties');
-        console.log('- /tx --command "my_work" | Show bounties you claimed');
-        console.log('- /tx --command "stats" | Platform statistics');
-        console.log('- /bounty_get --id "<bountyId>" | Get specific bounty details');
-        console.log(' ');
-        console.log('SYSTEM COMMANDS:');
-        console.log('- /get --key "<key>" [--confirmed true|false] | Read contract state directly');
-        console.log('- /msb | Show MSB balance and network status');
-        console.log(' ');
-        console.log('SIDECHANNEL COMMANDS:');
-        console.log('- /sc_join --channel "<name>" | Join sidechannel for bounty discussions');
-        console.log('- /sc_send --channel "<name>" --message "<text>" | Send message to channel');
-        console.log('- /sc_stats | Show sidechannel status');
+        console.log('=== IntercomBounty Menu ===');
+        console.log('Quick start:');
+        console.log('  /doctor');
+        console.log('  /deploy_subnet');
+        console.log('  /enable_transactions');
+        console.log('  /bounty_post --title "Test" --desc "Demo" --reward "1000000000000000000"');
+        console.log('  /tx --command "list_bounties" --sim 1');
+        console.log('More: /examples, /help, /exit');
         console.log(' ');
     }
 
@@ -271,6 +376,43 @@ class BountyProtocol extends Protocol{
      */
     async customCommand(input) {
         await super.tokenizeInput(input);
+        if (this.input.startsWith('/menu')) {
+            await this.printOptions();
+            return;
+        }
+        if (this.input.startsWith('/examples')) {
+            console.log('Examples:');
+            console.log('/bounty_post --title "Test Bounty" --desc "Testing bounty creation" --reward "1000000000000000000"');
+            console.log('/tx --command \'{"op":"post_bounty","title":"Test Bounty","description":"Testing bounty creation","reward":"1000000000000000000"}\'');
+            console.log('/tx --command "list_bounties" --sim 1');
+            console.log('/tx --command "stats" --sim 1');
+            console.log('/bounty_claim --id "bounty_1"');
+            console.log('/bounty_submit --id "bounty_1" --proof "https://github.com/you/repo"');
+            return;
+        }
+        if (this.input.startsWith('/doctor')) {
+            const validators = this.peer?.msbClient?.getConnectedValidatorsCount?.() ?? 0;
+            const txEnabledEntry = await this.peer.base.view.get('txen');
+            const txEnabled = txEnabledEntry === null ? 'default(true)' : String(txEnabledEntry.value);
+            const writable = this.peer?.base?.writable === true;
+            const bootstrapHex = b4a.isBuffer(this.peer?.config?.bootstrap)
+                ? this.peer.config.bootstrap.toString('hex')
+                : String(this.peer?.config?.bootstrap ?? '').toLowerCase();
+            const channelHex = b4a.isBuffer(this.peer?.config?.channel)
+                ? this.peer.config.channel.toString('hex')
+                : String(this.peer?.config?.channel ?? '');
+            console.log({
+                validatorsConnected: validators,
+                txEnabled,
+                writable,
+                subnetBootstrap: bootstrapHex,
+                subnetChannelHex: channelHex,
+            });
+            if (validators <= 0) {
+                console.log('No validators connected: write TX may fail/drop.');
+            }
+            return;
+        }
         if (this.input.startsWith("/get")) {
             const m = input.match(/(?:^|\s)--key(?:=|\s+)(\"[^\"]+\"|'[^']+'|\S+)/);
             const raw = m ? m[1].trim() : null;
@@ -774,7 +916,7 @@ class BountyProtocol extends Protocol{
             });
             
             console.log('Run this command to view:');
-            console.log(`/tx --command '${cmd}'`);
+            console.log(`/tx --command '${cmd}' --sim 1`);
             return;
         }
     }
