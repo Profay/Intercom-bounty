@@ -1,36 +1,34 @@
 import {Contract} from 'trac-peer'
 
-class SampleContract extends Contract {
+/**
+ * IntercomBounty - Decentralized Micro-Task Escrow Platform
+ * 
+ * A trustless bounty platform where:
+ * - Anyone can post bounties with TNK rewards
+ * - Workers claim and complete tasks
+ * - Funds are held in escrow via MSB
+ * - Deterministic approval releases funds
+ * 
+ * Built for the Intercom Vibe Competition
+ */
+class BountyContract extends Contract {
     /**
-     * Extending from Contract inherits its capabilities and allows you to define your own contract.
-     * The contract supports the corresponding protocol. Both files come in pairs.
+     * IntercomBounty Contract - Micro-Bounty Escrow System
      *
-     * Instances of this class run in contract context. The constructor is only called once on Peer
-     * instantiation.
+     * State Management:
+     * - bounties/[id] -> { id, title, description, reward, poster, status, claimer, proof, createdAt, claimedAt, completedAt }
+     * - bountyCounter -> total bounties created
+     * - bountyIndex/[status]/[id] -> indexing by status (open, claimed, completed, cancelled, rejected)
+     * - userBounties/[address]/posted/[id] -> user's posted bounties
+     * - userBounties/[address]/claimed/[id] -> user's claimed bounties
      *
-     * Please avoid using the following in your contract functions:
-     *
-     * No try-catch
-     * No throws
-     * No random values
-     * No http / api calls
-     * No super complex, costly calculations
-     * No massive storage of data.
-     * Never, ever modify "this.op" or "this.value", only read from it and use safeClone to modify.
-     * ... basically nothing that can lead to inconsistencies akin to Blockchain smart contracts.
-     *
-     * Running a contract on Trac gives you a lot of freedom, but it comes with additional responsibility.
-     * Make sure to benchmark your contract performance before release.
-     *
-     * If you need to inject data from "outside", you can utilize the Feature class and create your own
-     * oracles. Instances of Feature can be injected into the main Peer instance and enrich your contract.
-     *
-     * In the current version (Release 1), there is no inter-contract communication yet.
-     * This means it's not suitable yet for token standards.
-     * However, it's perfectly equipped for interoperability or standalone tasks.
-     *
-     * this.protocol: the peer's instance of the protocol managing contract concerns outside of its execution.
-     * this.options: the option stack passed from Peer instance
+     * Statuses:
+     * - open: Available for claiming
+     * - claimed: Worker is working on it
+     * - submitted: Work submitted, awaiting approval
+     * - completed: Approved and paid
+     * - rejected: Work rejected
+     * - cancelled: Bounty cancelled by poster
      *
      * @param protocol
      * @param options
@@ -39,68 +37,106 @@ class SampleContract extends Contract {
         // calling super and passing all parameters is required.
         super(protocol, options);
 
-        // simple function registration.
-        // since this function does not expect value payload, no need to sanitize.
-        // note that the function must match the type as set in Protocol.mapTxCommand()
-        this.addFunction('storeSomething');
-
-        // now we register the function with a schema to prevent malicious inputs.
-        // the contract uses the schema generator "fastest-validator" and can be found on npmjs.org.
-        //
-        // Since this is the "value" as of Protocol.mapTxCommand(), we must take it full into account.
-        // $$strict : true tells the validator for the object structure to be precise after "value".
-        //
-        // note that the function must match the type as set in Protocol.mapTxCommand()
-        this.addSchema('submitSomething', {
-            value : {
-                $$strict : true,
+        // ============================================
+        // BOUNTY WRITE OPERATIONS (State-changing)
+        // ============================================
+        
+        this.addSchema('postBounty', {
+            value: {
+                $$strict: true,
                 $$type: "object",
-                op : { type : "string", min : 1, max: 128 },
-                some_key : { type : "string", min : 1, max: 128 }
+                op: { type: "string", min: 1, max: 128 },
+                title: { type: "string", min: 1, max: 200 },
+                description: { type: "string", min: 1, max: 2000 },
+                reward: { type: "string", min: 1, max: 128 } // TNK amount as string
             }
         });
 
-        // in preparation to add an external Feature (aka oracle), we add a loose schema to make sure
-        // the Feature key is given properly. it's not required, but showcases that even these can be
-        // sanitized.
+        this.addSchema('claimBounty', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 }
+            }
+        });
+
+        this.addSchema('submitWork', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 },
+                proof: { type: "string", min: 1, max: 5000 } // URL or description
+            }
+        });
+
+        this.addSchema('approveBounty', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 }
+            }
+        });
+
+        this.addSchema('rejectBounty', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 },
+                reason: { type: "string", min: 1, max: 1000 }
+            }
+        });
+
+        this.addSchema('cancelBounty', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 }
+            }
+        });
+
+        // ============================================
+        // READ OPERATIONS (No state changes)
+        // ============================================
+        
+        this.addSchema('getBounty', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 }
+            }
+        });
+
+        this.addFunction('listBounties');
+        this.addFunction('getMyBounties');
+        this.addFunction('getMyClaimedBounties');
+        this.addFunction('getBountyStats');
+
+        // ============================================
+        // FEATURE INTEGRATION (Timer Oracle)
+        // ============================================
+        
         this.addSchema('feature_entry', {
-            key : { type : "string", min : 1, max: 256 },
-            value : { type : "any" }
+            key: { type: "string", min: 1, max: 256 },
+            value: { type: "any" }
         });
 
-        // read helpers (no state writes)
-        this.addFunction('readSnapshot');
-        this.addFunction('readChatLast');
-        this.addFunction('readTimer');
-        this.addSchema('readKey', {
-            value : {
-                $$strict : true,
-                $$type: "object",
-                op : { type : "string", min : 1, max: 128 },
-                key : { type : "string", min : 1, max: 256 }
-            }
-        });
-
-        // now we are registering the timer feature itself (see /features/time/ in package).
-        // note the naming convention for the feature name <feature-name>_feature.
-        // the feature name is given in app setup, when passing the feature classes.
+        // Timer feature for timestamps
         const _this = this;
-
-        // this feature registers incoming data from the Feature and if the right key is given,
-        // stores it into the smart contract storage.
-        // the stored data can then be further used in regular contract functions.
         this.addFeature('timer_feature', async function(){
             if(false === _this.check.validateSchema('feature_entry', _this.op)) return;
             if(_this.op.key === 'currentTime') {
-                if(null === await _this.get('currentTime')) console.log('timer started at', _this.op.value);
+                if(null === await _this.get('currentTime')) console.log('[IntercomBounty] Timer started at', _this.op.value);
                 await _this.put(_this.op.key, _this.op.value);
             }
         });
 
-        // last but not least, you may intercept messages from the built-in
-        // chat system, and perform actions similar to features to enrich your
-        // contract. check the _this.op value after you enabled the chat system
-        // and posted a few messages.
+        // Chat integration for bounty announcements
         this.messageHandler(async function(){
             if(_this.op?.type === 'msg' && typeof _this.op.msg === 'string'){
                 const currentTime = await _this.get('currentTime');
@@ -110,131 +146,337 @@ class SampleContract extends Contract {
                     at: currentTime ?? null
                 });
             }
-            console.log('message triggered contract', _this.op);
         });
     }
 
+    // ============================================
+    // WRITE OPERATIONS
+    // ============================================
+
     /**
-     * A simple contract function without values (=no parameters).
-     *
-     * Contract functions must be registered through either "this.addFunction" or "this.addSchema"
-     * or it won't execute upon transactions. "this.addFunction" does not sanitize values, so it should be handled with
-     * care or be used when no payload is to be expected.
-     *
-     * Schema is recommended to sanitize incoming data from the transaction payload.
-     * The type of payload data depends on your protocol.
-     *
-     * This particular function does not expect any payload, so it's fine to be just registered using "this.addFunction".
-     *
-     * However, as you can see below, what it does is checking if an entry for key "something" exists already.
-     * With the very first tx executing it, it will return "null" (default value of this.get if no value found).
-     * From the 2nd tx onwards, it will print the previously stored value "there is something".
-     *
-     * It is recommended to check for null existence before using put to avoid duplicate content.
-     *
-     * As a rule of thumb, all "this.put()" should go at the end of function execution to avoid code security issues.
-     *
-     * Putting data is atomic, should a Peer with a contract interrupt, the put won't be executed.
+     * Post a new bounty with reward
+     * Creates escrow entry and indexes the bounty
      */
-    async storeSomething(){
-        const something = await this.get('something');
+    async postBounty() {
+        const { title, description, reward } = this.value;
+        const poster = this.address;
+        const currentTime = await this.get('currentTime');
 
-        console.log('is there already something?', something);
+        // Validate reward amount
+        const rewardBigInt = this.protocol.safeBigInt(reward);
+        this.assert(rewardBigInt !== null, new Error('Invalid reward amount'));
+        this.assert(rewardBigInt > 0n, new Error('Reward must be greater than 0'));
 
-        if(null === something) {
-            await this.put('something', 'there is something');
+        // Get and increment counter
+        let counter = await this.get('bountyCounter');
+        counter = counter === null ? 1 : counter + 1;
+        const bountyId = `bounty_${counter}`;
+
+        // Create bounty object
+        const bounty = {
+            id: bountyId,
+            title,
+            description,
+            reward,
+            poster,
+            status: 'open',
+            claimer: null,
+            proof: null,
+            rejectionReason: null,
+            createdAt: currentTime,
+            claimedAt: null,
+            submittedAt: null,
+            completedAt: null
+        };
+
+        // Store bounty and update indexes
+        await this.put(`bounties/${bountyId}`, bounty);
+        await this.put('bountyCounter', counter);
+        await this.put(`bountyIndex/open/${bountyId}`, true);
+        await this.put(`userBounties/${poster}/posted/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Bounty posted: ${bountyId} by ${poster} - ${reward} TNK`);
+        console.log(`Title: ${title}`);
+    }
+
+    /**
+     * Claim an open bounty
+     */
+    async claimBounty() {
+        const { bountyId } = this.value;
+        const claimer = this.address;
+        const currentTime = await this.get('currentTime');
+
+        // Get bounty
+        const bounty = await this.get(`bounties/${bountyId}`);
+        this.assert(bounty !== null, new Error('Bounty not found'));
+        this.assert(bounty.status === 'open', new Error('Bounty is not available'));
+        this.assert(bounty.poster !== claimer, new Error('Cannot claim your own bounty'));
+
+        // Update bounty
+        const updated = this.protocol.safeClone(bounty);
+        updated.status = 'claimed';
+        updated.claimer = claimer;
+        updated.claimedAt = currentTime;
+
+        // Update indexes
+        await this.put(`bounties/${bountyId}`, updated);
+        await this.put(`bountyIndex/open/${bountyId}`, null);
+        await this.put(`bountyIndex/claimed/${bountyId}`, true);
+        await this.put(`userBounties/${claimer}/claimed/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Bounty claimed: ${bountyId} by ${claimer}`);
+    }
+
+    /**
+     * Submit work for a claimed bounty
+     */
+    async submitWork() {
+        const { bountyId, proof } = this.value;
+        const submitter = this.address;
+        const currentTime = await this.get('currentTime');
+
+        // Get bounty
+        const bounty = await this.get(`bounties/${bountyId}`);
+        this.assert(bounty !== null, new Error('Bounty not found'));
+        this.assert(bounty.status === 'claimed', new Error('Bounty is not in claimed status'));
+        this.assert(bounty.claimer === submitter, new Error('Only the claimer can submit work'));
+
+        // Update bounty
+        const updated = this.protocol.safeClone(bounty);
+        updated.status = 'submitted';
+        updated.proof = proof;
+        updated.submittedAt = currentTime;
+
+        // Update indexes
+        await this.put(`bounties/${bountyId}`, updated);
+        await this.put(`bountyIndex/claimed/${bountyId}`, null);
+        await this.put(`bountyIndex/submitted/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Work submitted: ${bountyId}`);
+        console.log(`Proof: ${proof.substring(0, 100)}...`);
+    }
+
+    /**
+     * Approve bounty and release funds (in production, this would trigger MSB transfer)
+     */
+    async approveBounty() {
+        const { bountyId } = this.value;
+        const approver = this.address;
+        const currentTime = await this.get('currentTime');
+
+        // Get bounty
+        const bounty = await this.get(`bounties/${bountyId}`);
+        this.assert(bounty !== null, new Error('Bounty not found'));
+        this.assert(bounty.status === 'submitted', new Error('No work submitted yet'));
+        this.assert(bounty.poster === approver, new Error('Only poster can approve'));
+
+        // Update bounty
+        const updated = this.protocol.safeClone(bounty);
+        updated.status = 'completed';
+        updated.completedAt = currentTime;
+
+        // Update indexes
+        await this.put(`bounties/${bountyId}`, updated);
+        await this.put(`bountyIndex/submitted/${bountyId}`, null);
+        await this.put(`bountyIndex/completed/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Bounty approved: ${bountyId}`);
+        console.log(`Payment released: ${bounty.reward} TNK to ${bounty.claimer}`);
+        console.log(`*** In production, MSB transfer would execute here ***`);
+    }
+
+    /**
+     * Reject submitted work
+     */
+    async rejectBounty() {
+        const { bountyId, reason } = this.value;
+        const rejector = this.address;
+        const currentTime = await this.get('currentTime');
+
+        // Get bounty
+        const bounty = await this.get(`bounties/${bountyId}`);
+        this.assert(bounty !== null, new Error('Bounty not found'));
+        this.assert(bounty.status === 'submitted', new Error('No work submitted yet'));
+        this.assert(bounty.poster === rejector, new Error('Only poster can reject'));
+
+        // Update bounty - return to claimed status
+        const updated = this.protocol.safeClone(bounty);
+        updated.status = 'claimed';
+        updated.proof = null;
+        updated.rejectionReason = reason;
+        updated.submittedAt = null;
+
+        // Update indexes
+        await this.put(`bounties/${bountyId}`, updated);
+        await this.put(`bountyIndex/submitted/${bountyId}`, null);
+        await this.put(`bountyIndex/claimed/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Work rejected: ${bountyId}`);
+        console.log(`Reason: ${reason}`);
+    }
+
+    /**
+     * Cancel an unclaimed bounty
+     */
+    async cancelBounty() {
+        const { bountyId } = this.value;
+        const canceller = this.address;
+        const currentTime = await this.get('currentTime');
+
+        // Get bounty
+        const bounty = await this.get(`bounties/${bountyId}`);
+        this.assert(bounty !== null, new Error('Bounty not found'));
+        this.assert(bounty.poster === canceller, new Error('Only poster can cancel'));
+        this.assert(bounty.status === 'open', new Error('Can only cancel unclaimed bounties'));
+
+        // Update bounty
+        const updated = this.protocol.safeClone(bounty);
+        updated.status = 'cancelled';
+        updated.completedAt = currentTime;
+
+        // Update indexes
+        await this.put(`bounties/${bountyId}`, updated);
+        await this.put(`bountyIndex/open/${bountyId}`, null);
+        await this.put(`bountyIndex/cancelled/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Bounty cancelled: ${bountyId}`);
+    }
+
+    // ============================================
+    // READ OPERATIONS
+    // ============================================
+
+    /**
+     * Get a specific bounty by ID
+     */
+    async getBounty() {
+        const { bountyId } = this.value;
+        const bounty = await this.get(`bounties/${bountyId}`);
+        
+        if (bounty === null) {
+            console.log(`[IntercomBounty] Bounty not found: ${bountyId}`);
+        } else {
+            console.log(`[IntercomBounty] Bounty ${bountyId}:`, bounty);
         }
     }
 
     /**
-     * Now we are using the schema-validated function defined in the constructor.
-     *
-     * The function also showcases some of the handy features like safe functions
-     * to prevent throws and safe bigint/decimal conversion.
+     * List all bounties
      */
-    async submitSomething(){
-        // the value of some_key shouldn't be empty, let's check that
-        if(this.value.some_key === ''){
-            return new Error('Cannot be empty');
-            // alternatively false for generic errors:
-            // return false;
+    async listBounties() {
+        const counter = await this.get('bountyCounter');
+        const total = counter === null ? 0 : counter;
+        
+        console.log(`[IntercomBounty] Total bounties: ${total}`);
+        
+        if (total === 0) {
+            console.log('No bounties posted yet.');
+            return;
         }
 
-        // of course the same works with assert (always use this.assert)
-        this.assert(this.value.some_key !== '', new Error('Cannot be empty'));
+        const bounties = [];
+        for (let i = 1; i <= total; i++) {
+            const bountyId = `bounty_${i}`;
+            const bounty = await this.get(`bounties/${bountyId}`);
+            if (bounty !== null) {
+                bounties.push(bounty);
+            }
+        }
 
-        // btw, please use safeBigInt provided by the contract protocol's superclass
-        // to calculate big integers:
-        const bigint = this.protocol.safeBigInt("1000000000000000000");
-
-        // making sure it didn't fail
-        this.assert(bigint !== null);
-
-        // you can also convert a bigint string into its decimal representation (as string)
-        const decimal = this.protocol.fromBigIntString(bigint.toString(), 18);
-
-        // and back into a bigint string
-        const bigint_string = this.protocol.toBigIntString(decimal, 18);
-
-        // let's clone the value
-        const cloned = this.protocol.safeClone(this.value);
-
-        // we want to pass the time from the timer feature.
-        // since mmodifications of this.value is not allowed, add this to the clone instead for storing:
-        cloned['timestamp'] = await this.get('currentTime');
-
-        // making sure it didn't fail (be aware of false-positives if null is passed to safeClone)
-        this.assert(cloned !== null);
-
-        // and now let's stringify the cloned value
-        const stringified = this.protocol.safeJsonStringify(cloned);
-
-        // and, you guessed it, best is to assert against null once more
-        this.assert(stringified !== null);
-
-        // and guess we are parsing it back
-        const parsed = this.protocol.safeJsonParse(stringified);
-
-        // parsing the json is a bit different: instead of null, we check against undefined:
-        this.assert(parsed !== undefined);
-
-        // finally we are storing what address submitted the tx and what the value was
-        await this.put('submitted_by/'+this.address, parsed.some_key);
-
-        // printing into the terminal works, too of course:
-        console.log('submitted by', this.address, parsed);
-    }
-
-    async readSnapshot(){
-        const something = await this.get('something');
-        const currentTime = await this.get('currentTime');
-        const msgl = await this.get('msgl');
-        const msg0 = await this.get('msg/0');
-        const msg1 = await this.get('msg/1');
-        console.log('snapshot', {
-            something,
-            currentTime,
-            msgl: msgl ?? 0,
-            msg0,
-            msg1
+        console.log('\n=== All Bounties ===');
+        bounties.forEach(b => {
+            console.log(`\n${b.id}: ${b.title}`);
+            console.log(`  Status: ${b.status}`);
+            console.log(`  Reward: ${b.reward} TNK`);
+            console.log(`  Poster: ${b.poster}`);
+            if (b.claimer) console.log(`  Claimer: ${b.claimer}`);
         });
     }
 
-    async readKey(){
-        const key = this.value?.key;
-        const value = key ? await this.get(key) : null;
-        console.log(`readKey ${key}:`, value);
+    /**
+     * Get bounties posted by current user
+     */
+    async getMyBounties() {
+        const poster = this.address;
+        const counter = await this.get('bountyCounter');
+        const total = counter === null ? 0 : counter;
+        
+        const myBounties = [];
+        for (let i = 1; i <= total; i++) {
+            const bountyId = `bounty_${i}`;
+            const hasPosted = await this.get(`userBounties/${poster}/posted/${bountyId}`);
+            if (hasPosted) {
+                const bounty = await this.get(`bounties/${bountyId}`);
+                if (bounty !== null) {
+                    myBounties.push(bounty);
+                }
+            }
+        }
+
+        console.log(`[IntercomBounty] Your posted bounties: ${myBounties.length}`);
+        myBounties.forEach(b => {
+            console.log(`\n${b.id}: ${b.title} (${b.status})`);
+            console.log(`  Reward: ${b.reward} TNK`);
+        });
     }
 
-    async readChatLast(){
-        const last = await this.get('chat_last');
-        console.log('chat_last:', last);
+    /**
+     * Get bounties claimed by current user
+     */
+    async getMyClaimedBounties() {
+        const claimer = this.address;
+        const counter = await this.get('bountyCounter');
+        const total = counter === null ? 0 : counter;
+        
+        const myBounties = [];
+        for (let i = 1; i <= total; i++) {
+            const bountyId = `bounty_${i}`;
+            const hasClaimed = await this.get(`userBounties/${claimer}/claimed/${bountyId}`);
+            if (hasClaimed) {
+                const bounty = await this.get(`bounties/${bountyId}`);
+                if (bounty !== null) {
+                    myBounties.push(bounty);
+                }
+            }
+        }
+
+        console.log(`[IntercomBounty] Your claimed bounties: ${myBounties.length}`);
+        myBounties.forEach(b => {
+            console.log(`\n${b.id}: ${b.title} (${b.status})`);
+            console.log(`  Reward: ${b.reward} TNK`);
+            console.log(`  Poster: ${b.poster}`);
+        });
     }
 
-    async readTimer(){
-        const currentTime = await this.get('currentTime');
-        console.log('currentTime:', currentTime);
+    /**
+     * Get platform statistics
+     */
+    async getBountyStats() {
+        const counter = await this.get('bountyCounter');
+        const total = counter === null ? 0 : counter;
+        
+        const stats = {
+            total: 0,
+            open: 0,
+            claimed: 0,
+            submitted: 0,
+            completed: 0,
+            cancelled: 0
+        };
+
+        for (let i = 1; i <= total; i++) {
+            const bountyId = `bounty_${i}`;
+            const bounty = await this.get(`bounties/${bountyId}`);
+            if (bounty !== null) {
+                stats.total++;
+                stats[bounty.status] = (stats[bounty.status] || 0) + 1;
+            }
+        }
+
+        console.log('[IntercomBounty] Platform Statistics:');
+        console.log(stats);
     }
 }
 
-export default SampleContract;
+export default BountyContract;

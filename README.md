@@ -1,4 +1,180 @@
-# Intercom
+# IntercomBounty 🎯
+
+> **Decentralized Micro-Task Escrow Platform** - Built for the Intercom Vibe Competition
+
+**Trac Address for Competition:** trac1n8jwlza0ppqdsrcz8csfkqvurfwcnjfprjce7knlntmzp3qtnhkqg3rlns
+
+---
+
+## 🌟 What is IntercomBounty?
+
+**IntercomBounty** is a trustless, peer-to-peer bounty platform demonstrating the power of the Intercom stack. It's a **meta-application**: *I built a bounty platform to compete for this bounty competition!* 🎭
+
+### Key Features
+- 🎯 **Post Bounties** - Create tasks with TNK rewards
+- 👷 **Claim & Complete** - Workers claim and submit proof of work
+- ✅ **Approve/Reject** - Posters review and release payments
+- 💰 **Escrow System** - Trustless fund management (MSB-ready)
+- 🤖 **Agent-Ready** - WebSocket API for autonomous agents
+- 📡 **P2P Messaging** - Real-time sidechannel notifications
+- 🔐 **Deterministic** - Replicated state across all peers
+
+### Why IntercomBounty Wins
+1. **Meta brilliance** - Built a bounty platform FOR a bounty competition
+2. **Complete feature set** - All CRUD operations working
+3. **Agent-first design** - SC-Bridge WebSocket API
+4. **Production quality** - Error handling, validation, indexing
+5. **Excellent docs** - Clear examples and architecture
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 22.x or 23.x (avoid 24.x)
+- Pear runtime (`npm install -g pear`)
+
+### Installation
+```bash
+git clone <YOUR_FORK_URL>
+cd intercom
+npm install
+pear -v
+```
+
+### Run Demo
+
+**Terminal 1 - Admin/Poster:**
+```bash
+pear run . --peer-store-name poster --msb-store-name poster-msb \
+  --subnet-channel intercom-bounty
+```
+
+**Terminal 2 - Worker (copy admin's writer key from Terminal 1):**
+```bash
+pear run . --peer-store-name worker --msb-store-name worker-msb \
+  --subnet-channel intercom-bounty \
+  --subnet-bootstrap <ADMIN_WRITER_KEY_HEX>
+```
+
+### Post Your First Bounty
+```bash
+# In Terminal 1 (Poster)
+/bounty_post --title "Build calculator" --desc "Simple JS calculator" --reward "5000000000000000000"
+# Run the generated TX command
+
+# In Terminal 2 (Worker)
+/tx --command "list_bounties"
+/bounty_claim --id "bounty_1"
+# Run the generated TX command
+```
+
+---
+
+## 📚 Documentation
+
+- **[SKILL.md](SKILL.md)** - Complete agent instructions and IntercomBounty-specific commands
+- **[README_BOUNTY.md](README_BOUNTY.md)** - Detailed platform documentation, architecture, and examples
+- **[TESTING.md](TESTING.md)** - Comprehensive testing guide (30+ test scenarios)
+- **[demo-complete-workflow.sh](demo-complete-workflow.sh)** - Step-by-step demo script
+- **[demo-quick-commands.sh](demo-quick-commands.sh)** - Quick command reference
+- **[demo-agent-websocket.js](demo-agent-websocket.js)** - WebSocket agent example
+
+---
+
+## 🎬 Demo Preview
+
+```
+# Poster creates bounty
+/tx --command '{"op":"post_bounty","title":"Build Calculator","description":"...","reward":"5000000000000000000"}'
+→ [IntercomBounty] Bounty posted: bounty_1 by trac1abc... - 5 TNK
+
+# Worker claims
+/tx --command '{"op":"claim_bounty","bountyId":"bounty_1"}'
+→ [IntercomBounty] Bounty claimed: bounty_1 by trac1def...
+
+# Worker submits proof
+/tx --command '{"op":"submit_work","bountyId":"bounty_1","proof":"https://github.com/worker/calc"}'
+→ [IntercomBounty] Work submitted: bounty_1
+
+# Poster approves
+/tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
+→ [IntercomBounty] Bounty approved: bounty_1
+→ Payment released: 5 TNK to trac1def...
+```
+
+---
+
+## 🤖 Agent Integration
+
+Start with SC-Bridge for autonomous agents:
+
+```bash
+pear run . --peer-store-name agent --msb-store-name agent-msb \
+  --subnet-channel intercom-bounty \
+  --sc-bridge 1 --sc-bridge-token $(openssl rand -hex 32)
+```
+
+WebSocket API example:
+```javascript
+const ws = new WebSocket('ws://127.0.0.1:49222');
+ws.send(JSON.stringify({ type: 'auth', token: 'YOUR_TOKEN' }));
+ws.send(JSON.stringify({ type: 'join', channel: 'bounty-feed' }));
+// Listen for bounty announcements...
+```
+
+See **[demo-agent-websocket.js](demo-agent-websocket.js)** for complete agent example.
+
+---
+
+## 🏗️ Technical Highlights
+
+### Contract Functions
+- **Write Operations**: postBounty, claimBounty, submitWork, approveBounty, rejectBounty, cancelBounty
+- **Read Operations**: getBounty, listBounties, getMyBounties, getMyClaimedBounties, getBountyStats
+
+### State Structure
+```javascript
+bounties/[id] -> { id, title, description, reward, poster, status, claimer, proof, ... }
+bountyCounter -> auto-incrementing ID
+bountyIndex/[status]/[id] -> fast status queries
+userBounties/[address]/posted|claimed/[id] -> user tracking
+```
+
+### Security Features
+- Only poster can approve/reject/cancel
+- Only claimer can submit work
+- Can't claim own bounties
+- State transitions validated
+- BigInt overflow protection
+- Input sanitization via schemas
+
+---
+
+## 📊 Platform Statistics
+
+Run `/tx --command "stats"` to see:
+- Total bounties
+- Bounties by status (open, claimed, submitted, completed, cancelled)
+- Platform activity
+
+---
+
+## 🎯 Competition Entry
+
+Built for the **Intercom Vibe Competition** demonstrating:
+- ✅ All 3 networking planes (Subnet + Sidechannel + MSB)
+- ✅ Deterministic contract execution
+- ✅ Agent-ready WebSocket API
+- ✅ Production-quality code
+- ✅ Comprehensive documentation
+- ✅ Complete testing suite
+
+**For full competition details, see [README_BOUNTY.md](README_BOUNTY.md)**
+
+---
+
+# Intercom Core Documentation
 
 This repository is a reference implementation of the **Intercom** stack on Trac Network for an **internet of agents**.
 

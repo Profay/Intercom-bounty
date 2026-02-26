@@ -85,7 +85,11 @@ const parseWelcomeArg = (raw) => {
     return null;
 };
 
-class SampleProtocol extends Protocol{
+/**
+ * IntercomBounty Protocol - Command Mapping & API
+ * Handles transaction routing and custom commands for the bounty platform
+ */
+class BountyProtocol extends Protocol{
 
     /**
      * Extending from Protocol inherits its capabilities and allows you to define your own protocol.
@@ -120,13 +124,8 @@ class SampleProtocol extends Protocol{
     }
 
     /**
-     * In order for a transaction to successfully trigger,
-     * you need to create a mapping for the incoming tx command,
-     * pointing at the contract function to execute.
-     *
-     * You can perform basic sanitization here, but do not use it to protect contract execution.
-     * Instead, use the built-in schema support for in-contract sanitization instead
-     * (Contract.addSchema() in contract constructor).
+     * Map transaction commands to contract functions
+     * IntercomBounty supports both simple commands and JSON payloads
      *
      * @param command
      * @returns {{type: string, value: *}|null}
@@ -134,70 +133,92 @@ class SampleProtocol extends Protocol{
     mapTxCommand(command){
         // prepare the payload
         let obj = { type : '', value : null };
-        /*
-        Triggering contract function in terminal will look like this:
-
-        /tx --command 'something'
-
-        You can also simulate a tx prior broadcast
-
-        /tx --command 'something' --sim 1
-
-        To programmatically execute a transaction from "outside",
-        the api function "this.api.tx()" needs to be exposed by adding
-        "api_tx_exposed : true" to the Peer instance options.
-        Once exposed, it can be used directly through peer.protocol_instance.api.tx()
-
-        Please study the superclass of this Protocol and Protocol.api to learn more.
-        */
-        if(command === 'something'){
-            // type points at the "storeSomething" function in the contract.
-            obj.type = 'storeSomething';
-            // value can be null as there is no other payload, but the property must exist.
-            obj.value = null;
-            // return the payload to be used in your contract
-            return obj;
-        } else if (command === 'read_snapshot') {
-            obj.type = 'readSnapshot';
+        
+        // ============================================
+        // BOUNTY OPERATIONS
+        // ============================================
+        // Simple read-only commands (no state changes)
+        if (command === 'list_bounties') {
+            obj.type = 'listBounties';
             obj.value = null;
             return obj;
-        } else if (command === 'read_chat_last') {
-            obj.type = 'readChatLast';
+        } else if (command === 'my_bounties') {
+            obj.type = 'getMyBounties';
             obj.value = null;
             return obj;
-        } else if (command === 'read_timer') {
-            obj.type = 'readTimer';
+        } else if (command === 'my_work') {
+            obj.type = 'getMyClaimedBounties';
+            obj.value = null;
+            return obj;
+        } else if (command === 'stats') {
+            obj.type = 'getBountyStats';
             obj.value = null;
             return obj;
         } else {
             /*
-            now we assume our protocol allows to submit a json string with information
-            what to do (the op) then we pass the parsed object to the value.
-            the accepted json string can be executed as tx like this:
-
-            /tx --command '{ "op" : "do_something", "some_key" : "some_data" }'
-
-            Of course we can simulate this, as well:
-
-            /tx --command '{ "op" : "do_something", "some_key" : "some_data" }' --sim 1
+            JSON-based bounty operations:
+            Examples:
+            
+            Post bounty:
+            /tx --command '{"op":"post_bounty","title":"Build calculator","description":"Create a simple calculator app","reward":"5000000000000000000"}'
+            
+            Claim bounty:
+            /tx --command '{"op":"claim_bounty","bountyId":"bounty_1"}'
+            
+            Submit work:
+            /tx --command '{"op":"submit_work","bountyId":"bounty_1","proof":"https://github.com/user/repo"}'
+            
+            Approve:
+            /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
+            
+            Reject:
+            /tx --command '{"op":"reject_bounty","bountyId":"bounty_1","reason":"Incomplete work"}'
+            
+            Read bounty:
+            /tx --command '{"op":"get_bounty","bountyId":"bounty_1"}'
             */
             const json = this.safeJsonParse(command);
-            if(json.op !== undefined && json.op === 'do_something'){
-                obj.type = 'submitSomething';
-                obj.value = json;
-                return obj;
-            } else if (json.op !== undefined && json.op === 'read_key') {
-                obj.type = 'readKey';
-                obj.value = json;
-                return obj;
-            } else if (json.op !== undefined && json.op === 'read_chat_last') {
-                obj.type = 'readChatLast';
-                obj.value = null;
-                return obj;
-            } else if (json.op !== undefined && json.op === 'read_timer') {
-                obj.type = 'readTimer';
-                obj.value = null;
-                return obj;
+            
+            if (json.op !== undefined) {
+                switch(json.op) {
+                    case 'post_bounty':
+                        obj.type = 'postBounty';
+                        obj.value = json;
+                        return obj;
+                    
+                    case 'claim_bounty':
+                        obj.type = 'claimBounty';
+                        obj.value = json;
+                        return obj;
+                    
+                    case 'submit_work':
+                        obj.type = 'submitWork';
+                        obj.value = json;
+                        return obj;
+                    
+                    case 'approve_bounty':
+                        obj.type = 'approveBounty';
+                        obj.value = json;
+                        return obj;
+                    
+                    case 'reject_bounty':
+                        obj.type = 'rejectBounty';
+                        obj.value = json;
+                        return obj;
+                    
+                    case 'cancel_bounty':
+                        obj.type = 'cancelBounty';
+                        obj.value = json;
+                        return obj;
+                    
+                    case 'get_bounty':
+                        obj.type = 'getBounty';
+                        obj.value = json;
+                        return obj;
+                    
+                    default:
+                        break;
+                }
             }
         }
         // return null if no case matches.
@@ -206,25 +227,38 @@ class SampleProtocol extends Protocol{
     }
 
     /**
-     * Prints additional options for your protocol underneath the system ones in terminal.
+     * Prints IntercomBounty commands for the interactive terminal
      *
      * @returns {Promise<void>}
      */
     async printOptions(){
         console.log(' ');
-        console.log('- Sample Commands:');
-        console.log("- /print | use this flag to print some text to the terminal: '--text \"I am printing\"");
-        console.log('- /get --key "<key>" [--confirmed true|false] | reads subnet state key (confirmed defaults to true).');
-        console.log('- /msb | prints MSB txv + lengths (local MSB node view).');
-        console.log('- /tx --command "read_chat_last" | prints last chat message captured by contract.');
-        console.log('- /tx --command "read_timer" | prints current timer feature value.');
-        console.log('- /sc_join --channel "<name>" | join an ephemeral sidechannel (no autobase).');
-        console.log('- /sc_open --channel "<name>" [--via "<channel>"] [--invite <json|b64|@file>] [--welcome <json|b64|@file>] | request others to open a sidechannel.');
-        console.log('- /sc_send --channel "<name>" --message "<text>" [--invite <json|b64|@file>] | send message over sidechannel.');
-        console.log('- /sc_invite --channel "<name>" --pubkey "<peer-pubkey-hex>" [--ttl <sec>] [--welcome <json|b64|@file>] | create a signed invite.');
-        console.log('- /sc_welcome --channel "<name>" --text "<message>" | create a signed welcome.');
-        console.log('- /sc_stats | show sidechannel channels + connection count.');
-        // further protocol specific options go here
+        console.log('=== IntercomBounty Commands ===');
+        console.log(' ');
+        console.log('BOUNTY OPERATIONS (Write):');
+        console.log('- /bounty_post --title "<title>" --desc "<description>" --reward "<amount>" | Post a new bounty');
+        console.log('- /bounty_claim --id "<bountyId>" | Claim an open bounty');
+        console.log('- /bounty_submit --id "<bountyId>" --proof "<url_or_text>" | Submit work for claimed bounty');
+        console.log('- /bounty_approve --id "<bountyId>" | Approve work and release funds');
+        console.log('- /bounty_reject --id "<bountyId>" --reason "<text>" | Reject work');
+        console.log('- /bounty_cancel --id "<bountyId>" | Cancel unclaimed bounty');
+        console.log(' ');
+        console.log('BOUNTY QUERIES (Read):');
+        console.log('- /tx --command "list_bounties" | List all bounties');
+        console.log('- /tx --command "my_bounties" | Show your posted bounties');
+        console.log('- /tx --command "my_work" | Show bounties you claimed');
+        console.log('- /tx --command "stats" | Platform statistics');
+        console.log('- /bounty_get --id "<bountyId>" | Get specific bounty details');
+        console.log(' ');
+        console.log('SYSTEM COMMANDS:');
+        console.log('- /get --key "<key>" [--confirmed true|false] | Read contract state directly');
+        console.log('- /msb | Show MSB balance and network status');
+        console.log(' ');
+        console.log('SIDECHANNEL COMMANDS:');
+        console.log('- /sc_join --channel "<name>" | Join sidechannel for bounty discussions');
+        console.log('- /sc_send --channel "<name>" --message "<text>" | Send message to channel');
+        console.log('- /sc_stats | Show sidechannel status');
+        console.log(' ');
     }
 
     /**
@@ -592,8 +626,158 @@ class SampleProtocol extends Protocol{
         if (this.input.startsWith("/print")) {
             const splitted = this.parseArgs(input);
             console.log(splitted.text);
+            return;
+        }
+        
+        // ============================================
+        // INTERCOM BOUNTY CUSTOM COMMANDS
+        // ============================================
+        
+        if (this.input.startsWith("/bounty_post")) {
+            const args = this.parseArgs(input);
+            const title = args.title || args.t;
+            const description = args.desc || args.description || args.d;
+            const reward = args.reward || args.r;
+            
+            if (!title || !description || !reward) {
+                console.log('Usage: /bounty_post --title "<title>" --desc "<description>" --reward "<amount>"');
+                console.log('Example: /bounty_post --title "Build calculator" --desc "Simple JS calculator" --reward "5000000000000000000"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'post_bounty',
+                title: String(title),
+                description: String(description),
+                reward: String(reward)
+            });
+            
+            console.log('Posting bounty...');
+            console.log('Run this command to execute:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+        
+        if (this.input.startsWith("/bounty_claim")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+            
+            if (!bountyId) {
+                console.log('Usage: /bounty_claim --id "<bountyId>"');
+                console.log('Example: /bounty_claim --id "bounty_1"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'claim_bounty',
+                bountyId: String(bountyId)
+            });
+            
+            console.log('Run this command to claim:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+        
+        if (this.input.startsWith("/bounty_submit")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+            const proof = args.proof || args.p;
+            
+            if (!bountyId || !proof) {
+                console.log('Usage: /bounty_submit --id "<bountyId>" --proof "<url_or_text>"');
+                console.log('Example: /bounty_submit --id "bounty_1" --proof "https://github.com/user/repo"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'submit_work',
+                bountyId: String(bountyId),
+                proof: String(proof)
+            });
+            
+            console.log('Run this command to submit:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+        
+        if (this.input.startsWith("/bounty_approve")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+            
+            if (!bountyId) {
+                console.log('Usage: /bounty_approve --id "<bountyId>"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'approve_bounty',
+                bountyId: String(bountyId)
+            });
+            
+            console.log('Run this command to approve:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+        
+        if (this.input.startsWith("/bounty_reject")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+            const reason = args.reason || args.r || 'Work does not meet requirements';
+            
+            if (!bountyId) {
+                console.log('Usage: /bounty_reject --id "<bountyId>" --reason "<text>"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'reject_bounty',
+                bountyId: String(bountyId),
+                reason: String(reason)
+            });
+            
+            console.log('Run this command to reject:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+        
+        if (this.input.startsWith("/bounty_cancel")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+            
+            if (!bountyId) {
+                console.log('Usage: /bounty_cancel --id "<bountyId>"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'cancel_bounty',
+                bountyId: String(bountyId)
+            });
+            
+            console.log('Run this command to cancel:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+        
+        if (this.input.startsWith("/bounty_get")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+            
+            if (!bountyId) {
+                console.log('Usage: /bounty_get --id "<bountyId>"');
+                return;
+            }
+            
+            const cmd = JSON.stringify({
+                op: 'get_bounty',
+                bountyId: String(bountyId)
+            });
+            
+            console.log('Run this command to view:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
         }
     }
 }
 
-export default SampleProtocol;
+export default BountyProtocol;
