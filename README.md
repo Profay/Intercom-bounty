@@ -37,7 +37,7 @@
 ### Installation
 ```bash
 git clone https://github.com/Profay/Intercom-bounty
-cd intercom
+cd Intercom-bounty
 npm install
 pear -v
 ```
