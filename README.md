@@ -108,7 +108,6 @@ pear run . --peer-store-name worker --msb-store-name worker-msb \
 
 ## 🖼️ Demo Interface Screenshot
 
-Use this visual in your prize submission to show the full escrow lifecycle in terminal mode:
 
 ![IntercomBounty Live Demo Screenshot](assets/intercombounty-demo-screenshot.svg)
 
