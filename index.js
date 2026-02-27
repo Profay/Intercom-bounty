@@ -451,6 +451,19 @@ if (verbose) {
   console.log('================================================================');
   console.log('');
 }
+
+const msbValidatorCountAtStartup = peer?.msbClient?.getConnectedValidatorsCount?.() ?? 0;
+if (msbValidatorCountAtStartup <= 0) {
+  setTimeout(() => {
+    const validators = peer?.msbClient?.getConnectedValidatorsCount?.() ?? 0;
+    if (validators <= 0) {
+      console.warn('[msb] No connected validators. Write TX and /deploy_subnet will fail until validator connectivity is available.');
+      console.warn('[msb] Check outbound network access or run with --msb-dht-bootstrap "<host:port,...>" for your validator network.');
+      console.warn('[msb] Use /doctor and /msb to verify readiness; use --sim 1 for read-only commands.');
+    }
+  }, 5000);
+}
+
 console.log('IntercomBounty ready ✨  (use /menu for commands)');
 
 Terminal.prototype.printHelp = function printHelpCompact() {

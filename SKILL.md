@@ -41,6 +41,10 @@ description: IntercomBounty - Decentralized Micro-Task Escrow Platform. A trustl
 ```bash
 /bounty_approve --id "bounty_1"
 # Generates: /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
+
+# Release approved funds:
+/bounty_release --id "bounty_1"
+# Generates: /tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
 ```
 
 **Reject work:**
@@ -202,7 +206,8 @@ ws.send(JSON.stringify({
 1. Listen for work_submitted events on `bounty-feed`
 2. Review proof (e.g., fetch URL, validate work)
 3. Execute TX: `{"op":"approve_bounty","bountyId":"bounty_1"}`
-4. Broadcast payment release to `bounty-feed`
+4. Execute TX: `{"op":"release_funds","bountyId":"bounty_1"}`
+5. Broadcast payment release to `bounty-feed`
 
 ## TNK Reward Amounts
 
@@ -216,7 +221,7 @@ Rewards are specified in **wei** (smallest TNK unit):
 ## Bounty State Lifecycle
 
 ```
-OPEN → CLAIMED → SUBMITTED → COMPLETED
+OPEN → CLAIMED → SUBMITTED → APPROVED → COMPLETED
   ↓       ↓                      
 CANCELLED (rejected returns to CLAIMED)
 ```
@@ -225,6 +230,7 @@ CANCELLED (rejected returns to CLAIMED)
 - `open` - Available for claiming
 - `claimed` - Worker is working on it
 - `submitted` - Work submitted, awaiting review
+- `approved` - Work approved, waiting for release
 - `completed` - Approved and paid
 - `rejected` - Work rejected, returned to claimed
 - `cancelled` - Bounty cancelled by poster

@@ -29,7 +29,7 @@ This self-referential genius showcases the platform's real-world utility immedia
 - ✅ Post bounties with TNK rewards
 - ✅ Claim open bounties
 - ✅ Submit work with proof
-- ✅ Approve/reject submissions
+- ✅ Approve/reject submissions + explicit fund release
 - ✅ Automatic escrow management
 - ✅ Real-time P2P notifications
 - ✅ Reputation tracking ready
@@ -127,6 +127,10 @@ pear run . --peer-store-name worker1 --msb-store-name worker1-msb \
 
 # Generated command:
 /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
+
+# Then release funds:
+/bounty_release --id "bounty_1"
+/tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
 ```
 
 ### Viewing Bounties
@@ -211,13 +215,15 @@ bounties/[id] -> {
   description: "...",
   reward: "5000000000000000000", // 5 TNK in wei
   poster: "trac1...",
-  status: "open|claimed|submitted|completed|rejected|cancelled",
+  status: "open|claimed|submitted|approved|completed|rejected|cancelled",
   claimer: "trac1...",
   proof: "https://...",
   rejectionReason: null,
   createdAt: timestamp,
   claimedAt: timestamp,
   submittedAt: timestamp,
+  approvedAt: timestamp,
+  releasedAt: timestamp,
   completedAt: timestamp
 }
 
@@ -241,11 +247,16 @@ userBounties/[address]/claimed/[id] -> true
      │              └─────┬─────┘
      │                    │
      │              approve│reject
-     │                ┌───┴───┐
-     │                ▼       ▼
-   ┌──▼──────┐   ┌──────┐ ┌────────┐
-   │CANCELLED│   │DONE  │ │CLAIMED │ (back to work)
-   └─────────┘   └──────┘ └────────┘
+     │                ┌───┴────┐
+     │                ▼        ▼
+   ┌──▼──────┐   ┌────────┐  ┌────────┐
+   │CANCELLED│   │APPROVED│  │CLAIMED │ (back to work)
+   └─────────┘   └────┬───┘  └────────┘
+                      │ release
+                      ▼
+                  ┌─────────┐
+                  │COMPLETED│
+                  └─────────┘
 ```
 
 ### Contract Functions
@@ -254,7 +265,8 @@ userBounties/[address]/claimed/[id] -> true
 - `postBounty(title, description, reward)` - Create new bounty
 - `claimBounty(bountyId)` - Claim open bounty
 - `submitWork(bountyId, proof)` - Submit completed work
-- `approveBounty(bountyId)` - Approve & release funds
+- `approveBounty(bountyId)` - Approve submitted work
+- `releaseFunds(bountyId)` - Release approved bounty funds
 - `rejectBounty(bountyId, reason)` - Reject submission
 - `cancelBounty(bountyId)` - Cancel unclaimed bounty
 
@@ -277,7 +289,7 @@ userBounties/[address]/claimed/[id] -> true
 
 ### 2. **Escrow Logic** (MSB Integration Ready)
 ```javascript
-// In production, approveBounty triggers MSB transfer:
+// In production, releaseFunds triggers MSB transfer:
 // await this.peer.msbClient.transfer(bounty.claimer, bounty.reward);
 // For demo, we log the intent and track state
 console.log(`Payment released: ${bounty.reward} TNK to ${bounty.claimer}`);
@@ -326,10 +338,18 @@ console.log(`*** In production, MSB transfer would execute here ***`);
 /bounty_approve --id "bounty_1"
 /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
 # Output: [IntercomBounty] Bounty approved: bounty_1
+#         Run releaseFunds to execute payout for trac1def...
+```
+
+**Step 5: Admin releases funds**
+```bash
+/bounty_release --id "bounty_1"
+/tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
+# Output: [IntercomBounty] Funds released: bounty_1
 #         Payment released: 5000000000000000000 TNK to trac1def...
 ```
 
-**Step 5: Check stats**
+**Step 6: Check stats**
 ```bash
 /tx --command "stats"
 # Output: Platform Statistics: { total: 1, completed: 1, ... }
@@ -435,6 +455,7 @@ Proof: https://github.com/worker/calculator-app
 ### Screenshot 3: Payment Released
 ```
 [IntercomBounty] Bounty approved: bounty_1
+[IntercomBounty] Funds released: bounty_1
 Payment released: 5000000000000000000 TNK to trac1def...
 *** In production, MSB transfer would execute here ***
 ```

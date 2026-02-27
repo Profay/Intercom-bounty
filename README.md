@@ -13,7 +13,7 @@
 ### Key Features
 - 🎯 **Post Bounties** - Create tasks with TNK rewards
 - 👷 **Claim & Complete** - Workers claim and submit proof of work
-- ✅ **Approve/Reject** - Posters review and release payments
+- ✅ **Approve/Reject/Release** - Posters review, approve, and release payments
 - 💰 **Escrow System** - Trustless fund management (MSB-ready)
 - 🤖 **Agent-Ready** - WebSocket API for autonomous agents
 - 📡 **P2P Messaging** - Real-time sidechannel notifications
@@ -100,7 +100,22 @@ pear run . --peer-store-name worker --msb-store-name worker-msb \
 # Poster approves
 /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
 → [IntercomBounty] Bounty approved: bounty_1
+
+/tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
+→ [IntercomBounty] Funds released: bounty_1
 → Payment released: 5 TNK to trac1def...
+```
+
+## 🖼️ Demo Interface Screenshot
+
+Use this visual in your prize submission to show the full escrow lifecycle in terminal mode:
+
+![IntercomBounty Live Demo Screenshot](assets/intercombounty-demo-screenshot.svg)
+
+Presentation command:
+
+```bash
+./demo-complete-workflow.sh
 ```
 
 ---
@@ -130,7 +145,7 @@ See **[demo-agent-websocket.js](demo-agent-websocket.js)** for complete agent ex
 ## 🏗️ Technical Highlights
 
 ### Contract Functions
-- **Write Operations**: postBounty, claimBounty, submitWork, approveBounty, rejectBounty, cancelBounty
+- **Write Operations**: postBounty, claimBounty, submitWork, approveBounty, releaseFunds, rejectBounty, cancelBounty
 - **Read Operations**: getBounty, listBounties, getMyBounties, getMyClaimedBounties, getBountyStats
 
 ### State Structure
@@ -155,7 +170,7 @@ userBounties/[address]/posted|claimed/[id] -> user tracking
 
 Run `/tx --command "stats"` to see:
 - Total bounties
-- Bounties by status (open, claimed, submitted, completed, cancelled)
+- Bounties by status (open, claimed, submitted, approved, completed, cancelled)
 - Platform activity
 
 ---

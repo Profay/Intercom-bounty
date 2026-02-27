@@ -1,0 +1,32 @@
+<svg width="1400" height="860" viewBox="0 0 1400 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="860" fill="#0b1020"/>
+  <rect x="60" y="54" width="1280" height="752" rx="14" fill="#111827" stroke="#334155"/>
+  <rect x="60" y="54" width="1280" height="44" rx="14" fill="#0f172a"/>
+  <circle cx="86" cy="76" r="7" fill="#ef4444"/>
+  <circle cx="108" cy="76" r="7" fill="#f59e0b"/>
+  <circle cx="130" cy="76" r="7" fill="#22c55e"/>
+  <text x="700" y="81" text-anchor="middle" font-family="Menlo, Monaco, Consolas, monospace" font-size="16" fill="#94a3b8">IntercomBounty Live Demo (Terminal)</text>
+
+  <text x="86" y="130" font-family="Menlo, Monaco, Consolas, monospace" font-size="22" fill="#22d3ee" font-weight="700">$ ./demo-complete-workflow.sh</text>
+  <text x="86" y="174" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#e2e8f0">STEP 0: Validator Readiness Gate</text>
+  <text x="86" y="205" font-family="Menlo, Monaco, Consolas, monospace" font-size="16" fill="#fde68a">/doctor</text>
+  <text x="86" y="231" font-family="Menlo, Monaco, Consolas, monospace" font-size="16" fill="#fde68a">/msb</text>
+  <text x="86" y="260" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#22c55e">✓ validatorsConnected: 3</text>
+
+  <text x="86" y="308" font-family="Menlo, Monaco, Consolas, monospace" font-size="18" fill="#e2e8f0">STEP 1-9 Execution Summary</text>
+  <text x="86" y="340" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#93c5fd">[IntercomBounty] Bounty posted: bounty_1 by trac1... - 5000000000000000000 TNK</text>
+  <text x="86" y="367" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#93c5fd">[IntercomBounty] Bounty claimed: bounty_1 by trac1...</text>
+  <text x="86" y="394" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#93c5fd">[IntercomBounty] Work submitted: bounty_1</text>
+  <text x="86" y="421" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#93c5fd">[IntercomBounty] Bounty approved: bounty_1</text>
+  <text x="86" y="448" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#93c5fd">[IntercomBounty] Funds released: bounty_1</text>
+  <text x="86" y="475" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#93c5fd">Payment released: 5000000000000000000 TNK to trac1...</text>
+
+  <rect x="86" y="520" width="1228" height="200" rx="10" fill="#0f172a" stroke="#1e293b"/>
+  <text x="110" y="560" font-family="Menlo, Monaco, Consolas, monospace" font-size="16" fill="#e2e8f0">Platform Statistics:</text>
+  <text x="110" y="590" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#cbd5e1">{ total: 1, open: 0, claimed: 0, submitted: 0, approved: 0, completed: 1, cancelled: 0 }</text>
+  <text x="110" y="636" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#22c55e">✅ State replicated across peers</text>
+  <text x="110" y="662" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#22c55e">✅ Escrow flow complete (approve → release)</text>
+  <text x="110" y="688" font-family="Menlo, Monaco, Consolas, monospace" font-size="15" fill="#22c55e">✅ Ready for competition demo recording</text>
+
+  <text x="86" y="780" font-family="Menlo, Monaco, Consolas, monospace" font-size="13" fill="#64748b">IntercomBounty • Sidechannel + Contract + MSB planes • Prize demo mode</text>
+</svg>

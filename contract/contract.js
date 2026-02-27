@@ -26,6 +26,7 @@ class BountyContract extends Contract {
      * - open: Available for claiming
      * - claimed: Worker is working on it
      * - submitted: Work submitted, awaiting approval
+    * - approved: Work approved, ready to release funds
      * - completed: Approved and paid
      * - rejected: Work rejected
      * - cancelled: Bounty cancelled by poster
@@ -72,6 +73,15 @@ class BountyContract extends Contract {
         });
 
         this.addSchema('approveBounty', {
+            value: {
+                $$strict: true,
+                $$type: "object",
+                op: { type: "string", min: 1, max: 128 },
+                bountyId: { type: "string", min: 1, max: 128 }
+            }
+        });
+
+        this.addSchema('releaseFunds', {
             value: {
                 $$strict: true,
                 $$type: "object",
@@ -186,6 +196,8 @@ class BountyContract extends Contract {
             createdAt: currentTime,
             claimedAt: null,
             submittedAt: null,
+            approvedAt: null,
+            releasedAt: null,
             completedAt: null
         };
 
@@ -246,6 +258,7 @@ class BountyContract extends Contract {
         const updated = this.protocol.safeClone(bounty);
         updated.status = 'submitted';
         updated.proof = proof;
+        updated.rejectionReason = null;
         updated.submittedAt = currentTime;
 
         // Update indexes
@@ -258,7 +271,7 @@ class BountyContract extends Contract {
     }
 
     /**
-     * Approve bounty and release funds (in production, this would trigger MSB transfer)
+     * Approve submitted bounty work
      */
     async approveBounty() {
         const { bountyId } = this.value;
@@ -273,15 +286,42 @@ class BountyContract extends Contract {
 
         // Update bounty
         const updated = this.protocol.safeClone(bounty);
-        updated.status = 'completed';
-        updated.completedAt = currentTime;
+        updated.status = 'approved';
+        updated.approvedAt = currentTime;
 
         // Update indexes
         await this.put(`bounties/${bountyId}`, updated);
         await this.put(`bountyIndex/submitted/${bountyId}`, null);
-        await this.put(`bountyIndex/completed/${bountyId}`, true);
+        await this.put(`bountyIndex/approved/${bountyId}`, true);
 
         console.log(`[IntercomBounty] Bounty approved: ${bountyId}`);
+        console.log(`Run releaseFunds to execute payout for ${bounty.claimer}`);
+    }
+
+    /**
+     * Release approved bounty funds (MSB-ready escrow step)
+     */
+    async releaseFunds() {
+        const { bountyId } = this.value;
+        const releaser = this.address;
+        const currentTime = await this.get('currentTime');
+
+        const bounty = await this.get(`bounties/${bountyId}`);
+        this.assert(bounty !== null, new Error('Bounty not found'));
+        this.assert(bounty.status === 'approved', new Error('Bounty must be approved before fund release'));
+        this.assert(bounty.poster === releaser, new Error('Only poster can release funds'));
+        this.assert(typeof bounty.claimer === 'string' && bounty.claimer.length > 0, new Error('No claimer to receive funds'));
+
+        const updated = this.protocol.safeClone(bounty);
+        updated.status = 'completed';
+        updated.releasedAt = currentTime;
+        updated.completedAt = currentTime;
+
+        await this.put(`bounties/${bountyId}`, updated);
+        await this.put(`bountyIndex/approved/${bountyId}`, null);
+        await this.put(`bountyIndex/completed/${bountyId}`, true);
+
+        console.log(`[IntercomBounty] Funds released: ${bountyId}`);
         console.log(`Payment released: ${bounty.reward} TNK to ${bounty.claimer}`);
         console.log(`*** In production, MSB transfer would execute here ***`);
     }
@@ -461,6 +501,7 @@ class BountyContract extends Contract {
             open: 0,
             claimed: 0,
             submitted: 0,
+            approved: 0,
             completed: 0,
             cancelled: 0
         };

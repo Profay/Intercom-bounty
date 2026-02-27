@@ -9,6 +9,20 @@ Before starting tests, ensure:
 - [ ] Dependencies installed (`npm install`)
 - [ ] No other Intercom instances running on same ports
 
+## Validator Connectivity Gate (Mandatory for write TX)
+
+Before running any test that sends write transactions (`post_bounty`, `claim_bounty`, `submit_work`, `approve_bounty`, `release_funds`, `cancel_bounty`, etc.), verify validator connectivity:
+
+```bash
+/doctor
+/msb
+```
+
+Required condition:
+- `validatorsConnected > 0`
+
+If `validatorsConnected` is `0`, write TX can fail/drop. Fix MSB bootstrap/network connectivity first, then continue.
+
 ---
 
 ## Test Scenario 1: Single Peer Basic Operations
@@ -21,9 +35,13 @@ pear run . --peer-store-name test-admin --msb-store-name test-admin-msb \
   --subnet-channel intercom-bounty-test
 
 # In the peer prompt (>) run once before tests:
+/doctor
+/msb
 /deploy_subnet
 /enable_transactions
 ```
+
+**Gate check:** proceed only if `/doctor` shows `validatorsConnected > 0`.
 
 ### Tests to Run
 
@@ -122,6 +140,15 @@ pear run . --peer-store-name worker --msb-store-name worker-msb \
   --subnet-bootstrap <ADMIN_WRITER_KEY_HEX>
 ```
 
+Run validator checks in both terminals before the workflow:
+
+```bash
+/doctor
+/msb
+```
+
+**Gate check:** both peers should report `validatorsConnected > 0` before write TX.
+
 ### Complete Workflow Tests
 
 #### Test 2.1: Poster Creates Bounty
@@ -193,13 +220,26 @@ pear run . --peer-store-name worker --msb-store-name worker-msb \
 
 # Expected output:
 # [IntercomBounty] Bounty approved: bounty_1
+# Run releaseFunds to execute payout for trac1...
+```
+
+**✅ PASS if:** Approval message shows and status changes to approved
+
+#### Test 2.7: Poster Releases Funds
+**In Terminal 1 (Poster):**
+```bash
+/bounty_release --id "bounty_1"
+/tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
+
+# Expected output:
+# [IntercomBounty] Funds released: bounty_1
 # Payment released: 5000000000000000000 TNK to trac1...
 # *** In production, MSB transfer would execute here ***
 ```
 
-**✅ PASS if:** Approval message shows, payment intent logged
+**✅ PASS if:** Fund release message shows with worker payout
 
-#### Test 2.7: Verify Completion
+#### Test 2.8: Verify Completion
 **In Both Terminals:**
 ```bash
 /tx --command "stats"

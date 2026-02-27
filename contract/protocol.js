@@ -292,6 +292,9 @@ class BountyProtocol extends Protocol{
             
             Approve:
             /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
+
+            Release:
+            /tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
             
             Reject:
             /tx --command '{"op":"reject_bounty","bountyId":"bounty_1","reason":"Incomplete work"}'
@@ -320,6 +323,11 @@ class BountyProtocol extends Protocol{
                     
                     case 'approve_bounty':
                         obj.type = 'approveBounty';
+                        obj.value = json;
+                        return obj;
+
+                    case 'release_funds':
+                        obj.type = 'releaseFunds';
                         obj.value = json;
                         return obj;
                     
@@ -355,12 +363,18 @@ class BountyProtocol extends Protocol{
      */
     async printOptions(){
         console.log(' ');
-        console.log('=== IntercomBounty Menu ===');
-        console.log('Quick start:');
+        console.log('=== IntercomBounty Live Menu ===');
+        console.log('Readiness gate:');
         console.log('  /doctor');
+        console.log('  /msb');
+        console.log('Quick start:');
         console.log('  /deploy_subnet');
         console.log('  /enable_transactions');
         console.log('  /bounty_post --title "Test" --desc "Demo" --reward "1000000000000000000"');
+        console.log('  /bounty_claim --id "bounty_1"');
+        console.log('  /bounty_submit --id "bounty_1" --proof "https://github.com/you/repo"');
+        console.log('  /bounty_approve --id "bounty_1"');
+        console.log('  /bounty_release --id "bounty_1"');
         console.log('  /tx --command "list_bounties" --sim 1');
         console.log('More: /examples, /help, /exit');
         console.log(' ');
@@ -388,6 +402,8 @@ class BountyProtocol extends Protocol{
             console.log('/tx --command "stats" --sim 1');
             console.log('/bounty_claim --id "bounty_1"');
             console.log('/bounty_submit --id "bounty_1" --proof "https://github.com/you/repo"');
+            console.log('/bounty_approve --id "bounty_1"');
+            console.log('/bounty_release --id "bounty_1"');
             return;
         }
         if (this.input.startsWith('/doctor')) {
@@ -878,6 +894,25 @@ class BountyProtocol extends Protocol{
             });
             
             console.log('Run this command to reject:');
+            console.log(`/tx --command '${cmd}'`);
+            return;
+        }
+
+        if (this.input.startsWith("/bounty_release")) {
+            const args = this.parseArgs(input);
+            const bountyId = args.id || args.bounty;
+
+            if (!bountyId) {
+                console.log('Usage: /bounty_release --id "<bountyId>"');
+                return;
+            }
+
+            const cmd = JSON.stringify({
+                op: 'release_funds',
+                bountyId: String(bountyId)
+            });
+
+            console.log('Run this command to release funds:');
             console.log(`/tx --command '${cmd}'`);
             return;
         }

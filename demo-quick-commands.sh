@@ -88,6 +88,11 @@ pear run . --peer-store-name agent --msb-store-name agent-msb \
 # Or direct:
 /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
 
+# Release approved funds
+/bounty_release --id "bounty_1"
+# Or direct:
+/tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
+
 # Reject work
 /bounty_reject --id "bounty_1" --reason "Incomplete implementation"
 # Or direct:
@@ -189,7 +194,8 @@ ws://127.0.0.1:49222
 3. Claim (worker): /tx --command '{"op":"claim_bounty","bountyId":"bounty_1"}'
 4. Submit (worker):/tx --command '{"op":"submit_work","bountyId":"bounty_1","proof":"https://test.com"}'
 5. Approve:        /tx --command '{"op":"approve_bounty","bountyId":"bounty_1"}'
-6. Check stats:    /tx --command "stats"
+6. Release funds:  /tx --command '{"op":"release_funds","bountyId":"bounty_1"}'
+7. Check stats:    /tx --command "stats"
 
 ---
 
